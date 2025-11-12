@@ -1,5 +1,6 @@
 import requests
 import json
+import time
 from typing import Dict, List
 
 class SecurityAgent:
@@ -7,6 +8,8 @@ class SecurityAgent:
         self.url = config['url']
         self.name = config['name']
         self.api_key = config.get('api_key')
+        self.max_retries = 3
+        self.retry_delay = 2  # seconds
     
     def review(self, code_diff: str, file_path: str) -> List[Dict]:
         """Send code to SIM.ai agent for security review"""
@@ -29,32 +32,48 @@ Provide findings in JSON format only, no other text."""
             "stream": False
         }
         
-        try:
-            response = requests.post(self.url, json=payload, headers=headers, timeout=30)
-            response.raise_for_status()
-            
-            result = response.json()
-            # Extract JSON from response (may be in 'message' or 'response' field)
-            content = result.get('message', result.get('response', ''))
-            
-            # Try to parse JSON from response
+        # Retry logic for rate limiting
+        for attempt in range(self.max_retries):
             try:
-                findings = json.loads(content)
-                return findings.get('findings', [])
-            except json.JSONDecodeError:
-                # Extract JSON from markdown code blocks if present
-                if '```json' in content:
-                    json_str = content.split('```json')[1].split('```')[0].strip()
-                    findings = json.loads(json_str)
+                response = requests.post(self.url, json=payload, headers=headers, timeout=30)
+                
+                # Handle rate limiting with backoff
+                if response.status_code == 429:
+                    if attempt < self.max_retries - 1:
+                        wait_time = self.retry_delay * (2 ** attempt)  # Exponential backoff
+                        print(f"{self.name}: Rate limited. Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        print(f"Error calling {self.name}: 429 Too Many Requests (max retries exceeded)")
+                        return []
+                
+                response.raise_for_status()
+                
+                result = response.json()
+                # Extract JSON from response (may be in 'message' or 'response' field)
+                content = result.get('message', result.get('response', ''))
+                
+                # Try to parse JSON from response
+                try:
+                    findings = json.loads(content)
                     return findings.get('findings', [])
+                except json.JSONDecodeError:
+                    # Extract JSON from markdown code blocks if present
+                    if '```json' in content:
+                        json_str = content.split('```json')[1].split('```')[0].strip()
+                        findings = json.loads(json_str)
+                        return findings.get('findings', [])
+                    return []
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 401:
+                    key_status = "API key is missing" if not self.api_key else "API key is invalid or workflow ID is inaccessible"
+                    print(f"Error calling {self.name}: 401 Unauthorized - {key_status}")
+                else:
+                    print(f"Error calling {self.name}: {e}")
                 return []
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 401:
-                key_status = "API key is missing" if not self.api_key else "API key is invalid or workflow ID is inaccessible"
-                print(f"Error calling {self.name}: 401 Unauthorized - {key_status}")
-            else:
+            except Exception as e:
                 print(f"Error calling {self.name}: {e}")
-            return []
-        except Exception as e:
-            print(f"Error calling {self.name}: {e}")
-            return []
+                return []
+        
+        return []
