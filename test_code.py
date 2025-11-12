@@ -7,7 +7,6 @@ import pickle
 
 # SECURITY ISSUE: Hardcoded credentials
 password = "admin123"
-api_key = "sk-sim-y4Dn3ibuPSHU8JYvrhygLCgmrVGdYR-f"
 
 def get_user_data(user_id):
     # SECURITY ISSUE: SQL injection vulnerability

@@ -12,10 +12,6 @@
 
 ---
 
-## File: `config.py`
-
----
-
 ## File: `review_report.md`
 
 ---
