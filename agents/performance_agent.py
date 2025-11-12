@@ -1,6 +1,5 @@
 import requests
 import json
-import time
 from typing import Dict, List
 
 class PerformanceAgent:
@@ -8,65 +7,96 @@ class PerformanceAgent:
         self.url = config['url']
         self.name = config['name']
         self.api_key = config.get('api_key')
-        self.max_retries = 3
-        self.retry_delay = 2  # seconds
     
     def review(self, code_diff: str, file_path: str) -> List[Dict]:
+        """Send code to SIM.ai agent for performance review"""
         headers = {'Content-Type': 'application/json'}
+        
         if self.api_key:
             headers['X-API-Key'] = self.api_key
         
-        prompt = f"""Review this code diff for performance issues:
-
-File: {file_path}
-
-```diff
-{code_diff}
-```
-
-Provide findings in JSON format only, no other text."""
+        # SIM.ai workflow format
+        payload = {
+            "code": code_diff,
+            "file_path": file_path
+        }
         
-        payload = {"message": prompt, "stream": False}
-        
-        # Retry logic for rate limiting
-        for attempt in range(self.max_retries):
-            try:
-                response = requests.post(self.url, json=payload, headers=headers, timeout=30)
+        try:
+            response = requests.post(self.url, json=payload, headers=headers, timeout=60)
+            response.raise_for_status()
+            result = response.json()
+            
+            # Extract from workflow response structure
+            if 'output' in result:
+                output = result['output']
                 
-                # Handle rate limiting with backoff
-                if response.status_code == 429:
-                    if attempt < self.max_retries - 1:
-                        wait_time = self.retry_delay * (2 ** attempt)  # Exponential backoff
-                        print(f"{self.name}: Rate limited. Retrying in {wait_time}s...")
-                        time.sleep(wait_time)
-                        continue
-                    else:
-                        print(f"Error calling {self.name}: 429 Too Many Requests (max retries exceeded)")
-                        return []
+                # Check for performance-specific analysis structure
+                if 'analysis' in output and isinstance(output['analysis'], dict):
+                    analysis = output['analysis']
+                    # Extract all performance issues
+                    findings = []
+                    
+                    # Add critical issues
+                    for issue in analysis.get('critical_issues', []):
+                        findings.append({
+                            'severity': issue.get('severity', 'CRITICAL'),
+                            'line': 0,
+                            'issue': issue.get('issue', issue.get('description', 'Unknown issue')),
+                            'recommendation': issue.get('recommendation', 'Review and fix')
+                        })
+                    
+                    # Add performance issues
+                    for issue in analysis.get('performance_issues', []):
+                        findings.append({
+                            'severity': issue.get('severity', 'HIGH'),
+                            'line': 0,
+                            'issue': issue.get('issue', issue.get('description', 'Unknown issue')),
+                            'recommendation': issue.get('recommendation', 'Review and fix')
+                        })
+                    
+                    # Add other issues
+                    for issue in analysis.get('memory_issues', []):
+                        findings.append({
+                            'severity': issue.get('severity', 'LOW'),
+                            'line': 0,
+                            'issue': issue.get('issue', issue.get('description', 'Unknown issue')),
+                            'recommendation': issue.get('recommendation', 'Review and fix')
+                        })
+                    
+                    return findings if findings else []
                 
-                response.raise_for_status()
-                result = response.json()
-                content = result.get('message', result.get('response', ''))
-                
-                try:
-                    findings = json.loads(content)
-                    return findings.get('findings', [])
-                except json.JSONDecodeError:
-                    if '```json' in content:
-                        json_str = content.split('```json')[1].split('```')[0].strip()
-                        findings = json.loads(json_str)
-                        return findings.get('findings', [])
-                    return []
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 401:
-                    key_status = "API key is missing" if not self.api_key else "API key is invalid or workflow ID is inaccessible"
-                    print(f"Error calling {self.name}: 401 Unauthorized - {key_status}")
+                # Fallback: look for content field
+                content = output.get('content', output)
+            elif 'data' in result:
+                content = result['data']
+            else:
+                content = result
+            
+            # Handle string content (JSON in string)
+            if isinstance(content, str):
+                # Try to extract JSON from markdown
+                if '```json' in content:
+                    json_str = content.split('```json')[1].split('```')[0].strip()
+                    findings = json.loads(json_str)
                 else:
-                    print(f"Error calling {self.name}: {e}")
-                return []
-            except Exception as e:
-                print(f"Error calling {self.name}: {e}")
-                return []
-        
-        return []
+                    # Try direct parse
+                    findings = json.loads(content)
+                return findings.get('findings', [])
+            
+            # Handle dict content
+            return content.get('findings', [])
+            
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] {self.name} JSON decode failed: {e}")
+            content_preview = content[:200] if isinstance(content, str) else str(content)[:200]
+            print(f"[ERROR] Content was: {content_preview}")
+            return []
+        except requests.exceptions.HTTPError as e:
+            print(f"[ERROR] {self.name} HTTP Error: {e.response.status_code}")
+            print(f"[ERROR] Response body: {e.response.text[:500]}")
+            return []
+        except Exception as e:
+            print(f"[ERROR] {self.name} failed: {e}")
+            return []
+
 
