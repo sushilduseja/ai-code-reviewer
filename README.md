@@ -123,8 +123,6 @@ The system generates a `review_report.md` file with organized findings:
 ## Agents
 
 ### Security Agent
-**Workflow**: `845faaf5-b6aa-4c6d-9019-7eddb97da6a5`
-
 Detects:
 - Hardcoded credentials (passwords, API keys, tokens)
 - SQL injection vulnerabilities
@@ -133,8 +131,6 @@ Detects:
 - Security best practice violations
 
 ### Performance Agent
-**Workflow**: `ba0f060e-ccb4-42ef-8d86-3a0ff1d932b4`
-
 Detects:
 - Algorithm complexity issues (O(n²), O(n³), etc.)
 - Memory inefficiencies
@@ -143,8 +139,6 @@ Detects:
 - Scalability problems
 
 ### Quality Agent
-**Workflow**: `c2a5be01-67af-474b-a6e7-dfd93c5a693c`
-
 Detects:
 - Poor naming conventions
 - Deep nesting and cyclomatic complexity
@@ -245,5 +239,6 @@ python test_agents.py
 ## License
 MIT
 
-## Support
-For issues or questions, please refer to the SIM.ai documentation at https://www.sim.ai
+## Attribution & Credits
+
+This project leverages **[SIM.ai](https://www.sim.ai/)** - an advanced AI workflow platform for code analysis and automation. The three core review agents (Security, Performance, and Quality) are powered by SIM.ai's sophisticated workflow technology.
