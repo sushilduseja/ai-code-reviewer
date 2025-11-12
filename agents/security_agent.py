@@ -12,7 +12,7 @@ class SecurityAgent:
         """Send code to SIM.ai agent for security review"""
         headers = {'Content-Type': 'application/json'}
         if self.api_key:
-            headers['Authorization'] = f'Bearer {self.api_key}'
+            headers['X-API-Key'] = self.api_key
         
         prompt = f"""Review this code diff for security vulnerabilities:
 
@@ -48,6 +48,13 @@ Provide findings in JSON format only, no other text."""
                     findings = json.loads(json_str)
                     return findings.get('findings', [])
                 return []
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 401:
+                key_status = "API key is missing" if not self.api_key else "API key is invalid or workflow ID is inaccessible"
+                print(f"Error calling {self.name}: 401 Unauthorized - {key_status}")
+            else:
+                print(f"Error calling {self.name}: {e}")
+            return []
         except Exception as e:
             print(f"Error calling {self.name}: {e}")
             return []

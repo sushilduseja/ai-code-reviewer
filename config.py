@@ -11,11 +11,11 @@ AGENTS = {
         "name": "Security Reviewer"
     },
     "performance": {
-        "url": "https://api.sim.ai/v1/agents/YOUR_PERFORMANCE_AGENT_ID/chat",
+        "url": "https://www.sim.ai/api/workflows/ba0f060e-ccb4-42ef-8d86-3a0ff1d932b4/execute",
         "name": "Performance Reviewer"
     },
     "quality": {
-        "url": "https://api.sim.ai/v1/agents/YOUR_QUALITY_AGENT_ID/chat",
+        "url": "https://www.sim.ai/api/workflows/c2a5be01-67af-474b-a6e7-dfd93c5a693c/execute",
         "name": "Quality Reviewer"
     }
 }
