@@ -2,7 +2,8 @@
 import sys
 from core.diff_parser import DiffParser
 from core.orchestrator import ReviewOrchestrator
-from config import AGENTS, SIM_API_KEY
+from config import AGENTS
+from config import SIM_API_KEY
 
 def main():
     # Parse arguments
